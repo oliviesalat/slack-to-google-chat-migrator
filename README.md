@@ -78,7 +78,7 @@ Run the migration using the main entry point:
 * Security: client_secrets.json, .env, and token.pickle are sensitive files. They are excluded from Git via .gitignore.
 * Rate Limiting: Built-in delays (0.4s – 1.0s) ensure the script doesn't get blocked by Google or Slack API protections.
 * Structure Preservation: The script preserves author names and original timestamps.
-
+* User Mapping: If a Slack user's email is missing or hidden by privacy settings, the system automatically assigns a placeholder: "unknown@domain.com".
 ---
 
 ## Project Structure
