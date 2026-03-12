@@ -3,6 +3,12 @@
 This tool automates the process of exporting message history from Slack channels (including DMs) and importing them into
 Google Chat Spaces.
 
+The script creates new Spaces in Google Chat and migrates messages using the following template:
+• [YYYY-MM-DD HH:MM] Author Name: Message Text
+
+Example:
+• [2022-10-24 15:29] John Smith: some message text...
+
 ---
 
 ## Prerequisites & Configuration
