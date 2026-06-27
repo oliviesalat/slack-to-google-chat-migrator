@@ -1,15 +1,17 @@
 import os
 import json
+import requests
 from datetime import datetime
 from slack_sdk import WebClient
 import certifi
 
 def run_slack_export():
     os.environ['SSL_CERT_FILE'] = certifi.where()
-    client = WebClient(token=os.getenv("SLACK_USER_TOKEN"))
+    token = os.getenv("SLACK_USER_TOKEN")
+    client = WebClient(token=token)
 
     try:
-        print("Loading users database...")
+        print("Loading users from database...")
         u_res = client.users_list()
         user_map = {
             u['id']: {
@@ -40,11 +42,22 @@ def run_slack_export():
                     info = user_map.get(u_id, {"name": "Unknown", "email": "unknown@domain.com"})
                     dt = datetime.fromtimestamp(float(msg['ts']))
 
+                    attachments = []
+                    for f in msg.get('files', []):
+                        url = f.get('url_private_download') or f.get('url_private')
+                        if url:
+                            attachments.append({
+                                "url": url,
+                                "name": f.get('name', 'file'),
+                                "mimetype": f.get('mimetype', 'application/octet-stream')
+                            })
+
                     clean_messages.append({
                         "text": msg.get('text', ''),
                         "author": info['name'],
                         "email": info['email'],
-                        "timestamp": dt.isoformat() + "Z"
+                        "timestamp": dt.isoformat() + "Z",
+                        "attachments": attachments
                     })
 
             filename = f"migration_{c_name}.json"
@@ -54,3 +67,47 @@ def run_slack_export():
 
     except Exception as e:
         print(f"Error in Slack export: {e}")
+
+    download_slack_files(token)
+
+
+def download_slack_files(token):
+    if not token:
+        print("ERROR: SLACK_USER_TOKEN is empty, cannot download files")
+        return
+
+    headers = {"Authorization": f"Bearer {token}"}
+    migration_files = [f for f in os.listdir('.') if f.startswith('migration_') and f.endswith('.json')]
+    total_ok, total_fail = 0, 0
+
+    for mf in migration_files:
+        channel_name = mf.replace('migration_', '').replace('.json', '')
+        with open(mf, 'r', encoding='utf-8') as f:
+            messages = json.load(f)
+
+        attachments_in_chat = [att for msg in messages for att in msg.get('attachments', [])]
+        if not attachments_in_chat:
+            continue
+
+        media_dir = os.path.join('media', channel_name)
+        os.makedirs(media_dir, exist_ok=True)
+        print(f"Downloading {len(attachments_in_chat)} files for {channel_name}...")
+
+        for attachment in attachments_in_chat:
+            file_path = os.path.join(media_dir, attachment['name'])
+            if os.path.exists(file_path):
+                print(f"  Skip (exists): {attachment['name']}")
+                total_ok += 1
+                continue
+            try:
+                r = requests.get(attachment['url'], headers=headers, timeout=60)
+                r.raise_for_status()
+                with open(file_path, 'wb') as out:
+                    out.write(r.content)
+                print(f"  OK: {attachment['name']}")
+                total_ok += 1
+            except Exception as e:
+                print(f"  FAIL: {attachment['name']} — {e}")
+                total_fail += 1
+
+    print(f"Files download done: {total_ok} ok, {total_fail} failed")
