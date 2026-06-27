@@ -12,7 +12,7 @@ def run_slack_export():
 
     try:
         print("Loading users from database...")
-        u_res = client.users_list()
+        u_res = client.users_list(include_deactivated=True)
         user_map = {
             u['id']: {
                 "name": u.get('real_name', u['name']),
