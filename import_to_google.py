@@ -121,9 +121,12 @@ def upload_messages_from_file(service, space_id, file_path, channel_name):
         if fallback_names:
             formatted_text += "\n" + " ".join(f"[file: {n}]" for n in fallback_names)
 
+        first_ref = attachment_refs[0] if attachment_refs else None
+        extra_refs = attachment_refs[1:] if len(attachment_refs) > 1 else []
+
         body = {"text": formatted_text}
-        if attachment_refs:
-            body["attachment"] = attachment_refs
+        if first_ref:
+            body["attachment"] = [first_ref]
 
         try:
             service.spaces().messages().create(parent=space_id, body=body).execute()
@@ -131,6 +134,13 @@ def upload_messages_from_file(service, space_id, file_path, channel_name):
             time.sleep(0.4)
         except Exception as e:
             print(f"Error in message: {e}")
+
+        for ref in extra_refs:
+            try:
+                service.spaces().messages().create(parent=space_id, body={"attachment": [ref]}).execute()
+                time.sleep(0.4)
+            except Exception as e:
+                print(f"Error sending extra attachment: {e}")
 
     return count
 
